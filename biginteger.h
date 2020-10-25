@@ -46,7 +46,7 @@ class BigInteger {
     }
   }
 
-  bool absolute_lower(const BigInteger& other) {
+  bool absolute_lower(const BigInteger& other) const {
     if (integer.size() == other.integer.size()) {
       for (size_t i = 0; i < integer.size(); i++) {
         if (integer[integer.size() - 1 - i] < other.integer[integer.size() - 1 - i]) {
@@ -60,6 +60,7 @@ class BigInteger {
     return integer.size() < other.integer.size();
   }
 public:
+
   BigInteger() = default;
 
   BigInteger(long long other) {
@@ -209,6 +210,23 @@ public:
     return *this;
   }
 
+  BigInteger operator+(const BigInteger& other) const {
+    BigInteger result = *this;
+    result += other;
+    return result;
+  }
+
+  BigInteger& operator++() {
+      *this += 1;
+      return *this;
+  }
+
+  BigInteger operator++(int) {
+    const BigInteger copy = *this;
+    *this += 1;
+    return copy;
+  }
+
   BigInteger& operator-=(const BigInteger& other) {
     if (other.integer.size() > integer.size()) {
       integer.resize(other.integer.size(), 0);
@@ -243,7 +261,78 @@ public:
     trim();
     return *this;
   }
+
+  BigInteger operator-(const BigInteger& other) const {
+    BigInteger result = *this;
+    result -= other;
+    return result;
+  }
+
+  BigInteger& operator*=(const BigInteger& other) {
+    BigInteger copy = *this;
+    integer.clear();
+    integer.resize(copy.integer.size() + other.integer.size());
+    sign = copy.sign * other.sign;
+    for (size_t i = 0; i < copy.integer.size(); ++i) {
+      for (size_t j = 0; j < other.integer.size(); ++j) {
+        integer[i + j] += copy.integer[i] * other.integer[j];
+      }
+    }
+    normalize();
+    trim();
+    return *this;
+  }
+
+  BigInteger operator*(const BigInteger& other) const {
+    BigInteger result = *this;
+    result *= other;
+    return result;
+  }
+
+  BigInteger& operator/=(BigInteger other) {
+    char new_sign = sign * other.sign;
+    BigInteger copy = *this;
+    copy.sign = abs(copy.sign);
+    other.sign = abs(other.sign);
+    *this = 0;
+    while (other.absolute_lower(copy + 1)) {
+      BigInteger store = other, factor = 1;
+      while ((store * base).absolute_lower(copy)) {
+        store *= base;
+        factor *= base;
+      }
+      while (store.absolute_lower(copy + 1)) {
+        copy -= store;
+        *this += factor;
+      }
+    }
+    sign = new_sign;
+    normalize();
+    trim();
+    return *this;
+  }
+
+  BigInteger operator/(const BigInteger& other) const {
+    BigInteger result = *this;
+    result /= other;
+    return result;
+  }
+
+  BigInteger& operator%=(const BigInteger& other) {
+    *this -= *this / other * other;
+    return *this;
+  }
+
+  BigInteger operator%(const BigInteger& other) const {
+    BigInteger result = *this;
+    result %= other;
+    return result;
+  }
 };
+
+BigInteger operator ""_bi(const unsigned long long other) {
+  return BigInteger(static_cast<long long>(other));
+}
 
 std::istream& operator>>(std::istream& in, BigInteger& input) {
   std::string s;
