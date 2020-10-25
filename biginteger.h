@@ -12,10 +12,10 @@ using std::cerr;
 using std::endl;
 
 class BigInteger {
-  static const int base = 100;
-  static const int number_of_digits = 2;
+  static const int base = 10;
+  static const int number_of_digits = 1;
   std::vector<int> integer = {};
-  short sign = 0;
+  char sign = 0;
 
   void trim() {
     while(!integer.empty() && integer.back() == 0) {
@@ -26,12 +26,46 @@ class BigInteger {
     }
   }
 
+  void normalize() {
+    for (int i = 0; i < integer.size(); ++i) {
+      if (integer[i] >= base) {
+        if (i + 1 == integer.size()) {
+          integer.push_back(integer[i] / base);
+        } else {
+          integer[i + 1] += integer[i] / base;
+        }
+        integer[i] %= base;
+      } else if (integer[i] < 0) {
+        integer[i + 1] += integer[i] / base;
+        integer[i] %= base;
+        if (integer[i] != 0) {
+          integer[i] += base;
+          integer[i + 1]--;
+        }
+      }
+    }
+  }
+
+  bool absolute_lower(const BigInteger& other) {
+    if (integer.size() == other.integer.size()) {
+      for (size_t i = 0; i < integer.size(); i++) {
+        if (integer[integer.size() - 1 - i] < other.integer[integer.size() - 1 - i]) {
+          return true;
+        } else if (integer[integer.size() - 1 - i] > other.integer[integer.size() - 1 - i]) {
+          return false;
+        }
+      }
+      return false;
+    }
+    return integer.size() < other.integer.size();
+  }
 public:
   BigInteger() = default;
 
   BigInteger(long long other) {
     if (other < 0) {
       sign = -1;
+      other = -other;
     } else if (other == 0) {
       sign = 0;
     } else {
@@ -95,6 +129,119 @@ public:
 
   explicit operator bool() const {
     return sign != 0;
+  }
+
+  bool operator==(const BigInteger& other) const {
+    return (sign == other.sign && integer == other.integer);
+  }
+
+  bool operator!=(const BigInteger& other) const {
+    return !(*this == other);
+  }
+
+  bool operator<(const BigInteger& other) const {
+    if (sign == other.sign) {
+      if (integer.size() == other.integer.size()) {
+        for (size_t i = 0; i < integer.size(); i++) {
+          if (integer[integer.size() - 1 - i] < other.integer[integer.size() - 1 - i]) {
+            return true;
+          } else if (integer[integer.size() - 1 - i] > other.integer[integer.size() - 1 - i]) {
+            return false;
+          }
+        }
+        return false;
+      }
+      return integer.size() < other.integer.size();
+    }
+    return sign < other.sign;
+  }
+
+  bool operator>=(const BigInteger& other) const {
+    return !(*this < other);
+  }
+
+  bool operator<=(const BigInteger& other) const {
+    return (*this < other || *this == other);
+  }
+
+  bool operator>(const BigInteger& other) const {
+    return !(*this <= other);
+  }
+
+  BigInteger operator-(int) const {
+    BigInteger negation = *this;
+    negation.sign *= -1;
+    return negation;
+  }
+
+  BigInteger& operator+=(const BigInteger& other) {
+    if (other.integer.size() > integer.size()) {
+      integer.resize(other.integer.size(), 0);
+    }
+    if (sign == other.sign || sign == 0 || other.sign == 0) {
+      if (sign == 0) {
+        sign = other.sign;
+      }
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] += other.integer[i];
+      }
+    } else if (absolute_lower(other)) {
+      if (other.sign == -1) {
+        sign = -1;
+      } else {
+        sign = 1;
+      }
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] = other.integer[i] - integer[i];
+      }
+    } else {
+      if (other.sign == -1) {
+        sign = 1;
+      } else {
+        sign = -1;
+      }
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] -= other.integer[i];
+      }
+    }
+    normalize();
+    trim();
+    return *this;
+  }
+
+  BigInteger& operator-=(const BigInteger& other) {
+    if (other.integer.size() > integer.size()) {
+      integer.resize(other.integer.size(), 0);
+    }
+    if (sign != other.sign || sign == 0 || other.sign == 0) {
+      if (sign == 0) {
+        sign = -other.sign;
+      }
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] += other.integer[i];
+      }
+    } else if (absolute_lower(other)) {
+      if (sign == -1) {
+        sign = 1;
+      } else {
+        sign = -1;
+      }
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] = other.integer[i] - integer[i];
+      }
+    } else {
+      if (sign == 1) {
+        sign = 1;
+      } else {
+        sign = -1;
+      }
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] -= other.integer[i];
+      }
+    }
+    normalize();
+    trim();
+    return *this;
   }
 };
 
