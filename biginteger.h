@@ -5,15 +5,19 @@
 #include <string>
 #include <vector>
 #include <iostream>
+#include <sstream>
 
-using std::cout;
-using std::cin;
-using std::cerr;
-using std::endl;
+class BigInteger;
+
+BigInteger operator+(const BigInteger& first_number, const BigInteger& second_number);
+
+BigInteger operator*(const BigInteger& first_number, const BigInteger& second_number);
+
+BigInteger operator/(const BigInteger& first_number, const BigInteger& second_number);
 
 class BigInteger {
-  static const int base = 10;
-  static const int number_of_digits = 1;
+  static const int base = 100;
+  static const int number_of_digits = 2;
   std::vector<int> integer = {};
   char sign = 0;
 
@@ -27,7 +31,7 @@ class BigInteger {
   }
 
   void normalize() {
-    for (int i = 0; i < integer.size(); ++i) {
+    for (size_t i = 0; i < integer.size(); ++i) {
       if (integer[i] >= base) {
         if (i + 1 == integer.size()) {
           integer.push_back(integer[i] / base);
@@ -132,6 +136,8 @@ public:
     return sign != 0;
   }
 
+  BigInteger& operator=(const BigInteger& other) = default;
+
   bool operator==(const BigInteger& other) const {
     return (sign == other.sign && integer == other.integer);
   }
@@ -169,7 +175,7 @@ public:
     return !(*this <= other);
   }
 
-  BigInteger operator-(int) const {
+  BigInteger operator-() const {
     BigInteger negation = *this;
     negation.sign *= -1;
     return negation;
@@ -208,12 +214,6 @@ public:
     normalize();
     trim();
     return *this;
-  }
-
-  BigInteger operator+(const BigInteger& other) const {
-    BigInteger result = *this;
-    result += other;
-    return result;
   }
 
   BigInteger& operator++() {
@@ -262,12 +262,6 @@ public:
     return *this;
   }
 
-  BigInteger operator-(const BigInteger& other) const {
-    BigInteger result = *this;
-    result -= other;
-    return result;
-  }
-
   BigInteger& operator*=(const BigInteger& other) {
     BigInteger copy = *this;
     integer.clear();
@@ -283,17 +277,12 @@ public:
     return *this;
   }
 
-  BigInteger operator*(const BigInteger& other) const {
-    BigInteger result = *this;
-    result *= other;
-    return result;
-  }
-
   BigInteger& operator/=(BigInteger other) {
+    if (other == 0) return *this;
     char new_sign = sign * other.sign;
     BigInteger copy = *this;
-    copy.sign = abs(copy.sign);
-    other.sign = abs(other.sign);
+    copy.sign = ::abs(copy.sign);
+    other.sign = ::abs(other.sign);
     *this = 0;
     while (other.absolute_lower(copy + 1)) {
       BigInteger store = other, factor = 1;
@@ -312,23 +301,49 @@ public:
     return *this;
   }
 
-  BigInteger operator/(const BigInteger& other) const {
-    BigInteger result = *this;
-    result /= other;
-    return result;
-  }
-
   BigInteger& operator%=(const BigInteger& other) {
     *this -= *this / other * other;
     return *this;
   }
 
-  BigInteger operator%(const BigInteger& other) const {
-    BigInteger result = *this;
-    result %= other;
-    return result;
+  BigInteger abs() {
+    BigInteger copy = *this;
+    if (copy.sign < 0) {
+      copy.sign = 1;
+    }
+    return copy;
   }
 };
+
+BigInteger operator*(const BigInteger& first_number, const BigInteger& second_number) {
+  BigInteger result = first_number;
+  result *= second_number;
+  return result;
+}
+
+BigInteger operator+(const BigInteger& first_number, const BigInteger& second_number) {
+  BigInteger result = first_number;
+  result += second_number;
+  return result;
+}
+
+BigInteger operator-(const BigInteger& first_number, const BigInteger& second_number) {
+  BigInteger result = first_number;
+  result -= second_number;
+  return result;
+}
+
+BigInteger operator%(const BigInteger& first_number, const BigInteger& second_number) {
+  BigInteger result = first_number;
+  result %= second_number;
+  return result;
+}
+
+BigInteger operator/(const BigInteger& first_number, const BigInteger& second_number) {
+  BigInteger result = first_number;
+  result /= second_number;
+  return result;
+}
 
 BigInteger operator ""_bi(const unsigned long long other) {
   return BigInteger(static_cast<long long>(other));
@@ -345,3 +360,165 @@ std::ostream& operator<<(std::ostream& out, const BigInteger& output) {
   out << output.toString();
   return out;
 }
+
+BigInteger gcd(const BigInteger& x, const BigInteger& y) {
+  return (y == 0 ? x : gcd(y, x % y));
+}
+
+class Rational {
+  static const int base = 10;
+  static const int number_of_digits = 1;
+  BigInteger numerator = {};
+  BigInteger denominator = {};
+
+  void normalize() {
+    BigInteger g = gcd(denominator, numerator).abs();
+    numerator /= g;
+    denominator /= g;
+    if (denominator < 0) {
+      denominator = -denominator;
+      numerator = -numerator;
+    }
+  }
+public:
+  Rational(): numerator(0), denominator(1) {};
+
+  Rational(const BigInteger& other): numerator(other), denominator(1) {};
+
+  Rational(const long long other): numerator(other), denominator(1) {};
+
+  Rational(const Rational& other):
+      numerator(other.numerator),
+      denominator(other.denominator) {};
+
+  std::string toString() const {
+    std::string output_numerator = numerator.toString();
+    std::string output_denominator = denominator.toString();
+    if (denominator != 1) {
+      return output_numerator + "/" + output_denominator;
+    } else {
+      return output_numerator;
+    }
+  }
+
+  Rational& operator=(const Rational& other) = default;
+
+  bool operator==(const Rational& other) const {
+    return numerator == other.numerator && denominator == other.denominator;
+  }
+
+  bool operator!=(const Rational& other) const {
+    return !(*this == other);
+  }
+
+  bool operator<(const Rational& other) const {
+    return numerator * other.denominator < denominator * other.numerator;
+  }
+
+  bool operator<=(const Rational& other) const {
+    return numerator * other.denominator <= denominator * other.numerator;
+  }
+
+  bool operator>(const Rational& other) const {
+    return numerator * other.denominator > denominator * other.numerator;
+  }
+
+  bool operator>=(const Rational& other) const {
+    return numerator * other.denominator >= denominator * other.numerator;
+  }
+
+  Rational operator-() const {
+    Rational negation = *this;
+    negation.numerator = -negation.numerator;
+    return negation;
+  }
+
+  Rational& operator+=(const Rational& other) {
+    numerator = numerator * other.denominator + other.numerator * denominator;
+    denominator = denominator * other.denominator;
+    normalize();
+    return *this;
+  }
+
+  Rational& operator-=(const Rational& other) {
+    numerator = numerator * other.denominator - other.numerator * denominator;
+    denominator = denominator * other.denominator;
+    normalize();
+    return *this;
+  }
+
+  Rational& operator*=(const Rational& other) {
+    numerator = numerator * other.numerator;
+    denominator = denominator * other.denominator;
+    normalize();
+    return *this;
+  }
+
+  Rational& operator/=(const Rational& other) {
+    numerator = numerator * other.denominator;
+    denominator = denominator * other.numerator;
+    normalize();
+    return *this;
+  }
+
+  std::string asDecimal(const size_t precision) const {
+    Rational copy = *this;
+    for (size_t i = 0; i < precision; i++) {
+      copy *= 10;
+    }
+    std::string current = (copy.numerator / copy.denominator).toString();
+    std::string result;
+    int is_negative = 0;
+    if (current[0] == '-') {
+      result += '-';
+      is_negative = 2;
+    }
+    while (result.size() + current.size() - is_negative <= precision) {
+      result += '0';
+    }
+    for (size_t i = (is_negative == 2 ? 1 : 0); i < current.size(); i++) {
+      result += current[i];
+    }
+    result.insert(result.begin() + result.size() - precision, '.');
+    return result;
+  }
+
+  explicit operator double() {
+    std::stringstream copy;
+    copy << asDecimal(100);
+    double result;
+    copy >> result;
+    return result;
+  }
+};
+
+Rational operator*(const Rational& first_number, const Rational& second_number) {
+  Rational result = first_number;
+  result *= second_number;
+  return result;
+}
+
+Rational operator+(const Rational& first_number, const Rational& second_number) {
+  Rational result = first_number;
+  result += second_number;
+  return result;
+}
+
+Rational operator-(const Rational& first_number, const Rational& second_number) {
+  Rational result = first_number;
+  result -= second_number;
+  return result;
+}
+
+Rational operator/(const Rational& first_number, const Rational& second_number) {
+  Rational result = first_number;
+  result /= second_number;
+  return result;
+}
+
+std::ostream& operator<<(std::ostream& out, const Rational& output) {
+  out << output.toString();
+  return out;
+}
+
+
