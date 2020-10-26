@@ -16,8 +16,8 @@ BigInteger operator*(const BigInteger& first_number, const BigInteger& second_nu
 BigInteger operator/(const BigInteger& first_number, const BigInteger& second_number);
 
 class BigInteger {
-  static const int base = 100;
-  static const int number_of_digits = 2;
+  static const int base = 10;
+  static const int number_of_digits = 1;
   std::vector<int> integer = {};
   char sign = 0;
 
@@ -366,8 +366,8 @@ BigInteger gcd(const BigInteger& x, const BigInteger& y) {
 }
 
 class Rational {
-  static const int base = 10;
-  static const int number_of_digits = 1;
+  static const int base = 100;
+  static const int number_of_digits = 2;
   BigInteger numerator = {};
   BigInteger denominator = {};
 
@@ -389,7 +389,8 @@ public:
 
   Rational(const Rational& other):
       numerator(other.numerator),
-      denominator(other.denominator) {};
+      denominator(other.denominator) {
+  };
 
   std::string toString() const {
     std::string output_numerator = numerator.toString();
@@ -483,7 +484,7 @@ public:
     return result;
   }
 
-  explicit operator double() {
+  explicit operator double() const {
     std::stringstream copy;
     copy << asDecimal(100);
     double result;
