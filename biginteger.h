@@ -456,6 +456,10 @@ public:
   }
 
   Rational& operator/=(const Rational& other) {
+    if (*this == other) {
+      *this = 1;
+      return *this;
+    }
     numerator = numerator * other.denominator;
     denominator = denominator * other.numerator;
     normalize();
