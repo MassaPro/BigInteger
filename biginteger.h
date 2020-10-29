@@ -6,6 +6,50 @@
 #include <vector>
 #include <iostream>
 #include <sstream>
+#include <complex>
+
+using complex = std::complex<double>;
+
+std::vector<complex> fft(const std::vector<complex>& polynom, bool reverse = false) {
+  if (polynom.size() == 1) {
+    return {complex(polynom[0])};
+  }
+  double angle = (reverse ? -1 : 1) * acos(-1) * 2 / polynom.size();
+  complex w(cos(angle), sin(angle)), counter = 1;
+  std::vector<complex> even, odd, result(polynom.size());
+  for (size_t i = 0; i < polynom.size(); ++i) {
+    (i % 2 == 0 ? even.emplace_back(polynom[i]) : odd.emplace_back(polynom[i]));
+  }
+  even = fft(even, reverse), odd = fft(odd, reverse);
+  for (size_t i = 0; i < even.size(); i++) {
+    result[i] = even[i] + odd[i] * counter;
+    counter *= w;
+  }
+  for (size_t i = 0; i < odd.size(); i++) {
+    result[i + even.size()] = even[i] + odd[i] * counter;
+    counter *= w;
+  }
+  return result;
+}
+
+std::vector<int> multiply(const std::vector<int>& first_polynom, const std::vector<int>& second_polynom) {
+  size_t degree = 1;
+  while (degree < std::max(first_polynom.size(), second_polynom.size())) degree *= 2;
+  degree *= 2;
+  std::vector<complex> fft_first(degree), fft_second(degree), fft_result(degree);
+  std::vector<int> result(degree);
+  for (size_t i = 0; i < first_polynom.size(); ++i) fft_first[i] = first_polynom[i];
+  for (size_t i = 0; i < second_polynom.size(); ++i) fft_second[i] = second_polynom[i];
+  fft_first = fft(fft_first), fft_second = fft(fft_second);
+  for (size_t i = 0; i < degree; i++) {
+    fft_result[i] = fft_first[i] * fft_second[i];
+  }
+  fft_result = fft(fft_result, true);
+  for (size_t i = 0; i < degree; i++) {
+    result[i] = floor(fft_result[i].real() / degree + 0.5);
+  }
+  return result;
+}
 
 class BigInteger;
 
@@ -16,8 +60,8 @@ BigInteger operator*(const BigInteger& first_number, const BigInteger& second_nu
 BigInteger operator/(const BigInteger& first_number, const BigInteger& second_number);
 
 class BigInteger {
-  static const int base = 10;
-  static const int number_of_digits = 1;
+  static const int base = 10000;
+  static const int number_of_digits = 4;
   std::vector<int> integer = {};
   char sign = 0;
 
@@ -217,8 +261,8 @@ public:
   }
 
   BigInteger& operator++() {
-      *this += 1;
-      return *this;
+    *this += 1;
+    return *this;
   }
 
   BigInteger operator++(int) {
@@ -263,15 +307,9 @@ public:
   }
 
   BigInteger& operator*=(const BigInteger& other) {
-    BigInteger copy = *this;
-    integer.clear();
-    integer.resize(copy.integer.size() + other.integer.size());
-    sign = copy.sign * other.sign;
-    for (size_t i = 0; i < copy.integer.size(); ++i) {
-      for (size_t j = 0; j < other.integer.size(); ++j) {
-        integer[i + j] += copy.integer[i] * other.integer[j];
-      }
-    }
+    char new_sign = sign * other.sign;
+    integer = multiply(integer, other.integer);
+    sign = new_sign;
     normalize();
     trim();
     return *this;
@@ -525,5 +563,3 @@ std::ostream& operator<<(std::ostream& out, const Rational& output) {
   out << output.toString();
   return out;
 }
-
-
