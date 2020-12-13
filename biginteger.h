@@ -1,5 +1,5 @@
 //
-// Created by Nikita Mastinen on 21.10.2020.
+// Created by Nikita Mastinen on 22.10.2020.
 //
 
 #include <string>
@@ -10,32 +10,46 @@
 
 using complex = std::complex<double>;
 
-std::vector<complex> fft(const std::vector<complex>& polynom, bool reverse = false) {
-  if (polynom.size() == 1) {
-    return {complex(polynom[0])};
-  }
-  double angle = (reverse ? -1 : 1) * acos(-1) * 2 / polynom.size();
-  complex w(cos(angle), sin(angle)), counter = 1;
-  std::vector<complex> even, odd, result(polynom.size());
-  for (size_t i = 0; i < polynom.size(); ++i) {
-    (i % 2 == 0 ? even.emplace_back(polynom[i]) : odd.emplace_back(polynom[i]));
-  }
-  even = fft(even, reverse), odd = fft(odd, reverse);
-  for (size_t i = 0; i < even.size(); i++) {
-    result[i] = even[i] + odd[i] * counter;
-    counter *= w;
-  }
-  for (size_t i = 0; i < odd.size(); i++) {
-    result[i + even.size()] = even[i] + odd[i] * counter;
-    counter *= w;
+size_t reverse_bits(size_t x, size_t n) {
+  size_t result = 0;
+  for (size_t i = 2, cnt = 0; i <= n; i *= 2, cnt++) {
+    size_t bit = (bool)(n / i & x);
+    result += (bit << cnt);
   }
   return result;
 }
 
-std::vector<int> multiply(const std::vector<int>& first_polynom, const std::vector<int>& second_polynom) {
+std::vector<complex> fft(std::vector<complex> polynom, bool reverse = false) {
+  for (size_t i = 0; i < polynom.size(); i++) {
+    if (i < reverse_bits(i, polynom.size())) {
+      swap(polynom[i], polynom[reverse_bits(i, polynom.size())]);
+    }
+  }
+  std::vector<complex> roots(polynom.size(), 1);
+  for (size_t i = 0; i < polynom.size(); i++) {
+    double angle = (reverse ? -1 : 1) * acos(-1) * 2 * i / polynom.size();
+    roots[i] = complex(cos(angle), sin(angle));
+  }
+  for (size_t i = 2; i <= polynom.size(); i *= 2) {
+    for (size_t j = 0; j < polynom.size(); j += i) {
+      complex counter = 1;
+      for (size_t k = j; k < j + i / 2; k++) {
+        complex even = polynom[k] + polynom[k + i / 2] * counter;
+        complex odd = polynom[k] - polynom[k + i / 2] * counter;
+        polynom[k] = even;
+        polynom[k + i / 2] = odd;
+        counter = roots[polynom.size() / i * (k - j + 1)];
+      }
+    }
+  }
+  return polynom;
+}
+
+std::vector<int> multiply(const std::vector<int>& first_polynom,
+    const std::vector<int>& second_polynom) {
   size_t degree = 1;
   while (degree < std::max(first_polynom.size(), second_polynom.size())) degree *= 2;
-  degree *= 2;
+  degree*=2;
   std::vector<complex> fft_first(degree), fft_second(degree), fft_result(degree);
   std::vector<int> result(degree);
   for (size_t i = 0; i < first_polynom.size(); ++i) fft_first[i] = first_polynom[i];
@@ -44,9 +58,11 @@ std::vector<int> multiply(const std::vector<int>& first_polynom, const std::vect
   for (size_t i = 0; i < degree; i++) {
     fft_result[i] = fft_first[i] * fft_second[i];
   }
+  fft_first.clear();
+  fft_second.clear();
   fft_result = fft(fft_result, true);
   for (size_t i = 0; i < degree; i++) {
-    result[i] = floor(fft_result[i].real() / degree + 0.5);
+    result[i] = round(fft_result[i].real() / degree);
   }
   return result;
 }
@@ -95,20 +111,41 @@ class BigInteger {
   }
 
   bool absolute_lower(const BigInteger& other) const {
-    if (integer.size() == other.integer.size()) {
-      for (size_t i = 0; i < integer.size(); i++) {
-        if (integer[integer.size() - 1 - i] < other.integer[integer.size() - 1 - i]) {
-          return true;
-        } else if (integer[integer.size() - 1 - i] > other.integer[integer.size() - 1 - i]) {
-          return false;
-        }
-      }
-      return false;
+    if (integer.size() != other.integer.size())
+      return integer.size() < other.integer.size();
+    for (size_t i = 0; i < integer.size(); i++) {
+      if (integer[integer.size() - 1 - i] < other.integer[integer.size() - 1 - i]) return true;
+      if (integer[integer.size() - 1 - i] > other.integer[integer.size() - 1 - i]) return false;
     }
-    return integer.size() < other.integer.size();
+    return false;
+  }
+
+  BigInteger& add(const BigInteger& other, bool is_subtract) {
+    if (other.integer.size() > integer.size()) {
+      integer.resize(other.integer.size(), 0);
+    }
+    if ((!is_subtract ^ (sign != other.sign)) || sign == 0 || other.sign == 0) {
+      if (sign == 0) sign = (is_subtract ? -other.sign : other.sign);
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] += other.integer[i];
+      }
+    } else if (absolute_lower(other)) {
+      if (!is_subtract) sign = other.sign;
+      if (is_subtract) sign = -sign;
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] = other.integer[i] - integer[i];
+      }
+    } else {
+      if (!is_subtract) sign = -other.sign;
+      for (size_t i = 0; i < other.integer.size(); i++) {
+        integer[i] -= other.integer[i];
+      }
+    }
+    normalize();
+    trim();
+    return *this;
   }
 public:
-
   BigInteger() = default;
 
   BigInteger(long long other) {
@@ -192,17 +229,7 @@ public:
 
   bool operator<(const BigInteger& other) const {
     if (sign == other.sign) {
-      if (integer.size() == other.integer.size()) {
-        for (size_t i = 0; i < integer.size(); i++) {
-          if (integer[integer.size() - 1 - i] < other.integer[integer.size() - 1 - i]) {
-            return true;
-          } else if (integer[integer.size() - 1 - i] > other.integer[integer.size() - 1 - i]) {
-            return false;
-          }
-        }
-        return false;
-      }
-      return integer.size() < other.integer.size();
+      return (sign == 1 ? absolute_lower(other) : !absolute_lower(other) && *this != other);
     }
     return sign < other.sign;
   }
@@ -212,11 +239,11 @@ public:
   }
 
   bool operator<=(const BigInteger& other) const {
-    return (*this < other || *this == other);
+    return other >= *this;
   }
 
   bool operator>(const BigInteger& other) const {
-    return !(*this <= other);
+    return other < *this;
   }
 
   BigInteger operator-() const {
@@ -226,38 +253,7 @@ public:
   }
 
   BigInteger& operator+=(const BigInteger& other) {
-    if (other.integer.size() > integer.size()) {
-      integer.resize(other.integer.size(), 0);
-    }
-    if (sign == other.sign || sign == 0 || other.sign == 0) {
-      if (sign == 0) {
-        sign = other.sign;
-      }
-      for (size_t i = 0; i < other.integer.size(); i++) {
-        integer[i] += other.integer[i];
-      }
-    } else if (absolute_lower(other)) {
-      if (other.sign == -1) {
-        sign = -1;
-      } else {
-        sign = 1;
-      }
-      for (size_t i = 0; i < other.integer.size(); i++) {
-        integer[i] = other.integer[i] - integer[i];
-      }
-    } else {
-      if (other.sign == -1) {
-        sign = 1;
-      } else {
-        sign = -1;
-      }
-      for (size_t i = 0; i < other.integer.size(); i++) {
-        integer[i] -= other.integer[i];
-      }
-    }
-    normalize();
-    trim();
-    return *this;
+    return add(other, 0);
   }
 
   BigInteger& operator++() {
@@ -272,38 +268,7 @@ public:
   }
 
   BigInteger& operator-=(const BigInteger& other) {
-    if (other.integer.size() > integer.size()) {
-      integer.resize(other.integer.size(), 0);
-    }
-    if (sign != other.sign || sign == 0 || other.sign == 0) {
-      if (sign == 0) {
-        sign = -other.sign;
-      }
-      for (size_t i = 0; i < other.integer.size(); i++) {
-        integer[i] += other.integer[i];
-      }
-    } else if (absolute_lower(other)) {
-      if (sign == -1) {
-        sign = 1;
-      } else {
-        sign = -1;
-      }
-      for (size_t i = 0; i < other.integer.size(); i++) {
-        integer[i] = other.integer[i] - integer[i];
-      }
-    } else {
-      if (sign == 1) {
-        sign = 1;
-      } else {
-        sign = -1;
-      }
-      for (size_t i = 0; i < other.integer.size(); i++) {
-        integer[i] -= other.integer[i];
-      }
-    }
-    normalize();
-    trim();
-    return *this;
+    return add(other, true);
   }
 
   BigInteger& operator*=(const BigInteger& other) {
@@ -404,8 +369,6 @@ BigInteger gcd(const BigInteger& x, const BigInteger& y) {
 }
 
 class Rational {
-  static const int base = 100;
-  static const int number_of_digits = 2;
   BigInteger numerator = {};
   BigInteger denominator = {};
 
@@ -459,11 +422,11 @@ public:
   }
 
   bool operator>(const Rational& other) const {
-    return numerator * other.denominator > denominator * other.numerator;
+    return other < *this;
   }
 
   bool operator>=(const Rational& other) const {
-    return numerator * other.denominator >= denominator * other.numerator;
+    return other <= *this;
   }
 
   Rational operator-() const {
